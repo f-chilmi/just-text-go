@@ -1,7 +1,17 @@
 package main
 
-import "github.com/f-chilmi/blog/api"
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/f-chilmi/just-text-go/router"
+)
 
 func main() {
-	api.Run()
+	r := router.Router()
+
+	fmt.Println("Starting server on port 8080")
+
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
