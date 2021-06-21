@@ -22,6 +22,17 @@ type response struct {
 	Message string `json:"message,omitempty"`
 }
 
+type responseNew struct {
+	Message models.Message `json:"message,omitempty"`
+}
+
+// func newRespMsg() *models.Message {
+// 	return &models.Message{
+// 		CreatedAt: time.Now(),
+// 		UpdatedAt: time.Now(),
+// 	}
+// }
+
 func createConnection() *sql.DB {
 	fmt.Println("create connection")
 	// load .env file
@@ -301,4 +312,131 @@ func updateUser(id int64, user models.User) int64 {
 	fmt.Printf("Total rows/record affected %v", rowsAffected)
 
 	return rowsAffected
+}
+
+func NewMsg(w http.ResponseWriter, r *http.Request) {
+	// set the header to content type x-www-form-urlencoded
+	// Allow all origin to handle cors issue
+	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// create an empty user of type models.User
+	var message models.Message
+
+	err := json.NewDecoder(r.Body).Decode(&message)
+
+	if err != nil {
+		responses.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// check if rooms existed
+	roomsExisted, err := findRoom(message.IdSender, message.IdRecipient)
+
+	fmt.Println("roomsExisted", roomsExisted, err)
+
+	var idRoom int64
+	// create new room if no room found
+	if err == sql.ErrNoRows {
+		fmt.Println("no rooms")
+		var dataRoom models.Room
+		dataRoom.IdUser1 = message.IdRecipient
+		dataRoom.IdUser2 = message.IdSender
+		dataRoom.LastMsg = message.Content
+
+		idRoom, err = newRoom(dataRoom)
+
+		if err != nil {
+			responses.ERROR(w, http.StatusBadRequest, err)
+			return
+		}
+	}
+
+	// create new message
+	message.IdRoom = idRoom
+	newM, err := newMsg(message)
+
+	if err != nil {
+		responses.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	newM.IdRoom = idRoom
+	res := responseNew{
+		Message: newM,
+	}
+
+	// send all the users as response
+	responses.JSON(w, http.StatusOK, res)
+	// json.NewEncoder(w).Encode(res)
+}
+
+func newMsg(message models.Message) (models.Message, error) {
+	// create the db connection
+	db := createConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	// create the insert query
+	// returning userid will return the id of the inserted user
+	sqlStatement := `INSERT INTO messages (id_sender, id_recipient, id_room, content) VALUES ($1, $2, $3, $4) RETURNING *;`
+
+	// inserted id will store in this id
+	var messages models.Message
+
+	// execute the sql statement
+	// scan function will save the inserted id in the id
+	row := db.QueryRow(sqlStatement, message.IdSender, message.IdRecipient, message.IdRoom, message.Content)
+
+	err := row.Scan(&messages.ID, &messages.IdSender, &messages.IdRecipient, &messages.Content, &messages.CreatedAt, &messages.UpdatedAt, &message.IdRoom)
+
+	// return the inserted message
+	return messages, err
+}
+
+func findRoom(idUser1 int64, idUser2 int64) (models.Room, error) {
+	// create the db connection
+	db := createConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	// create the select query
+	sqlStatement := `SELECT * FROM rooms WHERE (id_user1=$1 AND id_user2=$2) OR (id_user1=$2 AND id_user2=$1);`
+
+	// inserted id will store in this id
+	var room models.Room
+
+	// execute the sql statement
+	row := db.QueryRow(sqlStatement, idUser1, idUser2)
+
+	err := row.Scan(&room.ID, &room.IdUser1, &room.IdUser2, &room.LastMsg, &room.CreatedAt, &room.UpdatedAt)
+
+	// return the inserted message
+	return room, err
+}
+
+func newRoom(r models.Room) (int64, error) {
+	// create the db connection
+	db := createConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	// create the insert query
+	// returning userid will return the id of the inserted user
+	sqlStatement := `INSERT INTO rooms (id_user1, id_user2, last_msg) VALUES ($1, $2, $3) RETURNING id;`
+
+	// inserted id will store in this id
+	var idRoom int64
+
+	// execute the sql statement
+	// scan function will save the inserted id in the id
+	err := db.QueryRow(sqlStatement, r.IdUser1, r.IdUser2, r.LastMsg).Scan(&idRoom)
+
+	// return the inserted message
+	return idRoom, err
 }

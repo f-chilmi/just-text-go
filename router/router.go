@@ -18,5 +18,7 @@ func Router() *mux.Router {
 	router.HandleFunc("/user", controllers.CreateUser).Methods("POST", "OPTIONS")
 	router.HandleFunc("/user/{id}", controllers.UpdateUser).Methods("PUT", "OPTIONS")
 
+	router.HandleFunc("/new-msg", controllers.NewMsg).Methods("POST", "OPTIONS")
+
 	return router
 }
