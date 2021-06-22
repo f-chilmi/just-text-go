@@ -22,16 +22,17 @@ type response struct {
 	Message string `json:"message,omitempty"`
 }
 
+type basicRes struct {
+	Message string `json:"message,omitempty"`
+}
+
 type responseNew struct {
 	Message models.Message `json:"message,omitempty"`
 }
 
-// func newRespMsg() *models.Message {
-// 	return &models.Message{
-// 		CreatedAt: time.Now(),
-// 		UpdatedAt: time.Now(),
-// 	}
-// }
+type responseRoom struct {
+	data models.Room `json: room,omitempty`
+}
 
 func createConnection() *sql.DB {
 	fmt.Println("create connection")
@@ -338,6 +339,7 @@ func NewMsg(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("roomsExisted", roomsExisted, err)
 
 	var idRoom int64
+
 	// create new room if no room found
 	if err == sql.ErrNoRows {
 		fmt.Println("no rooms")
@@ -353,6 +355,8 @@ func NewMsg(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	idRoom = roomsExisted.ID
 
 	// create new message
 	message.IdRoom = idRoom
@@ -419,6 +423,28 @@ func findRoom(idUser1 int64, idUser2 int64) (models.Room, error) {
 	return room, err
 }
 
+func findRoomById(id int64) (models.Room, error) {
+	// create the db connection
+	db := createConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	// create the select query
+	sqlStatement := `SELECT * FROM rooms WHERE id=$1;`
+
+	// inserted id will store in this id
+	var room models.Room
+
+	// execute the sql statement
+	row := db.QueryRow(sqlStatement, id)
+
+	err := row.Scan(&room.ID, &room.IdUser1, &room.IdUser2, &room.LastMsg, &room.CreatedAt, &room.UpdatedAt)
+
+	// return the inserted message
+	return room, err
+}
+
 func newRoom(r models.Room) (int64, error) {
 	// create the db connection
 	db := createConnection()
@@ -439,4 +465,219 @@ func newRoom(r models.Room) (int64, error) {
 
 	// return the inserted message
 	return idRoom, err
+}
+
+func FindByPhone(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// get the userid from the request params, key is "id"
+	params := mux.Vars(r)
+
+	// convert the id type from string to int
+	phone := params["phone"]
+
+	user, err := getUserByPhone(phone)
+
+	switch err {
+	case sql.ErrNoRows:
+		res := basicRes{Message: "no user found"}
+		responses.JSON(w, http.StatusBadRequest, res)
+		return
+	case nil:
+		break
+	default:
+		responses.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// if user found, now check is there room for id token (me) and user.ID
+	roomExisted, err := findRoom(int64(1), int64(user.ID))
+
+	switch err {
+	case sql.ErrNoRows:
+
+		newR := models.Room{
+			IdUser1: 1,
+			IdUser2: user.ID,
+			LastMsg: "",
+		}
+
+		idRoom, err := newRoom(newR)
+		if err != nil {
+			responses.ERROR(w, http.StatusBadRequest, err)
+			return
+		}
+
+		roomExisted, err = findRoomById(idRoom)
+		if err != nil {
+			responses.ERROR(w, http.StatusBadRequest, err)
+			return
+		}
+
+	case nil:
+		break
+	default:
+		responses.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// send all the users as response
+	responses.JSON(w, http.StatusOK, roomExisted)
+
+}
+
+func getUserByPhone(phone string) (models.User, error) {
+	// create the postgres db connection
+	db := createConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	var user models.User
+
+	// create the select sql query
+	sqlStatement := `SELECT * FROM users WHERE phone=$1`
+
+	// execute the sql statement
+	row := db.QueryRow(sqlStatement, phone)
+
+	err := row.Scan(&user.ID, &user.Username, &user.Phone, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+
+	// return empty user on error
+	return user, err
+}
+
+func OpenRoom(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	var err error
+
+	params := mux.Vars(r)
+
+	idR, err := strconv.Atoi(params["id"])
+	if err != nil {
+		responses.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	roomChat, err := openRoomChat(idR)
+
+	if err != nil {
+		responses.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// send all the users as response
+	responses.JSON(w, http.StatusOK, roomChat)
+
+}
+
+func ListRoom(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	var err error
+
+	// for token id
+	// params := mux.Vars(r)
+
+	// idR, err := strconv.Atoi(params["id"])
+	idR := 1
+	if err != nil {
+		responses.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	roomChat, err := listRoomByToken(idR)
+
+	if err != nil {
+		responses.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// send all the users as response
+	responses.JSON(w, http.StatusOK, roomChat)
+
+}
+
+func openRoomChat(idR int) ([]models.Message, error) {
+	// create the postgres db connection
+	db := createConnection()
+
+	var err error
+
+	// close the db connection
+	defer db.Close()
+
+	var chats []models.Message
+
+	// create the select sql query
+	sqlStatement := `SELECT * FROM messages WHERE id_room=$1`
+
+	// execute the sql statement
+	rows, err := db.Query(sqlStatement, idR)
+
+	helpers.CheckError("Unable to execute the query.", err)
+
+	// close the statement
+	defer rows.Close()
+
+	// iterate over the rows
+	for rows.Next() {
+		var chat models.Message
+
+		// unmarshal the row object to user
+		err = rows.Scan(&chat.ID, &chat.IdSender, &chat.IdRecipient, &chat.Content, &chat.CreatedAt, &chat.UpdatedAt, &chat.IdRoom)
+
+		helpers.CheckError("Unable to scan the row.", err)
+
+		// append the user in the users slice
+		chats = append(chats, chat)
+
+	}
+
+	// return empty user on error
+	return chats, err
+}
+
+func listRoomByToken(idR int) ([]models.Room, error) {
+	// create the postgres db connection
+	db := createConnection()
+
+	var err error
+
+	// close the db connection
+	defer db.Close()
+
+	var rooms []models.Room
+
+	// create the select sql query
+	sqlStatement := `SELECT * FROM rooms WHERE id_user1=$1 OR id_user2=$1`
+
+	// execute the sql statement
+	rows, err := db.Query(sqlStatement, idR)
+
+	helpers.CheckError("Unable to execute the query.", err)
+
+	// close the statement
+	defer rows.Close()
+
+	// iterate over the rows
+	for rows.Next() {
+		var room models.Room
+
+		// unmarshal the row object to user
+		err = rows.Scan(&room.ID, &room.IdUser1, &room.IdUser2, &room.LastMsg, &room.CreatedAt, &room.UpdatedAt)
+
+		helpers.CheckError("Unable to scan the row.", err)
+
+		// append the user in the users slice
+		rooms = append(rooms, room)
+
+	}
+
+	// return empty user on error
+	return rooms, err
 }
