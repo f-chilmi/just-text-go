@@ -1,11 +1,17 @@
 package models
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
+	"html"
+	"strings"
 	"time"
 
+	"github.com/f-chilmi/just-text-go/auth"
 	"github.com/f-chilmi/just-text-go/db"
 	"github.com/f-chilmi/just-text-go/helpers"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
@@ -15,6 +21,124 @@ type User struct {
 	Password  string    `json:"password"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (u *User) Prepare() {
+	u.Username = html.EscapeString(strings.TrimSpace(u.Username))
+	u.Phone = html.EscapeString(strings.TrimSpace(u.Phone))
+	u.Password = html.EscapeString(strings.TrimSpace(u.Password))
+}
+
+func (u *User) Validate(action string) error {
+	switch strings.ToLower(action) {
+	case "update":
+		switch "" {
+		case u.Username:
+			return errors.New("required username")
+		case u.Password:
+			return errors.New("required password")
+		case u.Phone:
+			return errors.New("required phone")
+		default:
+			return nil
+		}
+
+	case "login":
+		switch "" {
+		case u.Password:
+			return errors.New("required password")
+		case u.Phone:
+			return errors.New("required phone")
+		default:
+			return nil
+		}
+
+	case "register":
+		switch "" {
+		case u.Username:
+			return errors.New("required username")
+		case u.Password:
+			return errors.New("required password")
+		case u.Phone:
+			return errors.New("required phone")
+		default:
+			return nil
+		}
+
+	default:
+		switch "" {
+		case u.Username:
+			return errors.New("required username")
+		case u.Password:
+			return errors.New("required password")
+		case u.Phone:
+			return errors.New("required phone")
+		default:
+			return nil
+		}
+	}
+}
+
+func Hash(password string) ([]byte, error) {
+	return bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+}
+
+func VerifyPassword(hashedPassword, password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+}
+
+func (u *User) Login(phone string, password string) (string, error) {
+
+	var err error
+
+	user := User{}
+
+	db := db.CreateConnection()
+	err = db.QueryRow(`
+		SELECT id, 
+		username, 
+		phone,
+		password,
+		created_at,
+		updated_at
+		FROM users WHERE phone=&1
+		`, phone).
+		Scan(&u)
+
+	if err != nil {
+		return "", err
+	}
+
+	err = VerifyPassword(user.Password, password)
+	if err != nil && err == bcrypt.ErrMismatchedHashAndPassword {
+		return "", err
+	}
+	return auth.CreateToken(uint32(u.ID))
+}
+
+func (u *User) Register(username string, phone string, password string) (string, error) {
+	var err error
+
+	// user := User{}
+	var id int64
+
+	db := db.CreateConnection()
+	err = db.QueryRow(`SELECT id FROM users WHERE phone=$1`, phone).Scan(&id)
+	switch err {
+	case sql.ErrNoRows:
+		hashedPw, err := Hash(password)
+		if err != nil {
+			return "", err
+		}
+		fmt.Println(hashedPw, err, "hashedPassword")
+		return "", err
+	case nil:
+		break
+	default:
+		break
+	}
+
+	return "success", err
 }
 
 func (u *User) InsertUser(user User) (int64, error) {
@@ -128,4 +252,25 @@ func (u *User) UpdateUser(id int64, user User) int64 {
 	fmt.Printf("Total rows/record affected %v", rowsAffected)
 
 	return rowsAffected
+}
+
+func (u *User) GetUserByPhone(phone string) (User, error) {
+	// create the postgres db connection
+	db := db.CreateConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	var user User
+
+	// create the select sql query
+	sqlStatement := `SELECT * FROM users WHERE phone=$1`
+
+	// execute the sql statement
+	row := db.QueryRow(sqlStatement, phone)
+
+	err := row.Scan(&user.ID, &user.Username, &user.Phone, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+
+	// return empty user on error
+	return user, err
 }

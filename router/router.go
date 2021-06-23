@@ -12,6 +12,11 @@ func Router() *mux.Router {
 	fmt.Println("router called")
 	router := mux.NewRouter()
 
+	// authentications
+	router.HandleFunc("/register", controllers.Register).Methods("POST", "OPTIONS")
+	router.HandleFunc("/login", controllers.Login).Methods("POST", "OPTIONS")
+
+	// users
 	router.HandleFunc("/", controllers.HomeController).Methods("GET", "OPTIONS")
 	router.HandleFunc("/users", controllers.FindAll).Methods("GET", "OPTIONS")
 	router.HandleFunc("/user/{id}", controllers.FindById).Methods("GET", "OPTIONS")
