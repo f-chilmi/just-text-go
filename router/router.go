@@ -1,8 +1,6 @@
 package router
 
 import (
-	"fmt"
-
 	"github.com/gorilla/mux"
 
 	"github.com/f-chilmi/just-text-go/controllers"
@@ -10,7 +8,6 @@ import (
 )
 
 func Router() *mux.Router {
-	fmt.Println("router called")
 	router := mux.NewRouter()
 
 	// authentications
@@ -21,7 +18,6 @@ func Router() *mux.Router {
 	router.HandleFunc("/", middlewares.SetMiddlewareAuth(controllers.HomeController)).Methods("GET", "OPTIONS")
 	router.HandleFunc("/users", middlewares.SetMiddlewareAuth(controllers.FindAll)).Methods("GET", "OPTIONS")
 	router.HandleFunc("/user/{id}", middlewares.SetMiddlewareAuth(controllers.FindById)).Methods("GET", "OPTIONS")
-	router.HandleFunc("/user", controllers.CreateUser).Methods("POST", "OPTIONS")
 	router.HandleFunc("/user/{id}", middlewares.SetMiddlewareAuth(controllers.UpdateUser)).Methods("PUT", "OPTIONS")
 
 	router.HandleFunc("/new-msg", controllers.NewMsg).Methods("POST", "OPTIONS")

@@ -37,42 +37,6 @@ func HomeController(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func CreateUser(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("create user called")
-
-	userM := models.User{}
-
-	// set the header to content type x-www-form-urlencoded
-	// Allow all origin to handle cors issue
-	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-	// create an empty user of type models.User
-	var user models.User
-
-	err := json.NewDecoder(r.Body).Decode(&user)
-
-	helpers.CheckError("Unable to decode the request body", err)
-
-	insertId, err := userM.InsertUser(user)
-
-	if err != nil {
-		responses.ERROR(w, http.StatusBadRequest, err)
-		return
-	}
-
-	res := response{
-		ID:      insertId,
-		Message: "user created successfully",
-	}
-
-	// send the response
-	json.NewEncoder(w).Encode(res)
-}
-
 func FindAll(w http.ResponseWriter, r *http.Request) {
 	userM := models.User{}
 

@@ -1,18 +1,14 @@
 package models
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"html"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/f-chilmi/just-text-go/db"
 	"github.com/f-chilmi/just-text-go/helpers"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
@@ -24,13 +20,20 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type Token struct {
+type GenerateTokenRes struct {
 	ID       int64  `json:"id"`
-	Username string `json:"username"`
 	Phone    string `json:"phone"`
+	Username string `json:"username"`
+	Exp      int64  `json:"exp"`
 }
 
-var secretkey = os.Getenv("SECRET_KEY")
+type ResLoginWithToken struct {
+	ID       int64  `json:"id"`
+	Phone    string `json:"phone"`
+	Username string `json:"username"`
+	Exp      int64  `json:"exp"`
+	Token    string `json:"token"`
+}
 
 func (u *User) Prepare() {
 	u.Username = html.EscapeString(strings.TrimSpace(u.Username))
@@ -88,146 +91,15 @@ func (u *User) Validate(action string) error {
 	}
 }
 
-func Hash(password string) ([]byte, error) {
-	return bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-}
-
-func HashAndSalt(pwd []byte) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword(pwd, bcrypt.MinCost)
-	if err != nil {
-		return "", err
-	}
-	return string(hash), err
-}
-
-func CheckPasswordHash(password, hash string) error {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err
-}
-
-func GeneratehashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
-}
-
-func GenerateJWT(id int64, username string, phone string) (string, error) {
-	var mySigningKey = []byte(secretkey)
-	token := jwt.New(jwt.SigningMethodHS256)
-	claims := token.Claims.(jwt.MapClaims)
-
-	claims["authorized"] = true
-	claims["id"] = id
-	claims["username"] = username
-	claims["phone"] = phone
-	claims["exp"] = time.Now().Add(time.Minute * 30).Unix()
-
-	tokenString, err := token.SignedString(mySigningKey)
-
-	if err != nil {
-		return "", err
-	}
-	return tokenString, nil
-}
-
-func (u *User) Login(phone string, password string) (string, error) {
-	var err error
-
-	user := User{}
-
-	db := db.CreateConnection()
-
-	err = db.QueryRow(`
-		SELECT id, 
-		username, 
-		phone,
-		password,
-		created_at,
-		updated_at
-		FROM users WHERE phone=$1
-		`, phone).
-		Scan(&user.ID, &user.Username, &user.Phone, &user.Password, &user.CreatedAt, &user.UpdatedAt)
-
-	if err != nil {
-		return "", err
-	}
-
-	err = CheckPasswordHash(password, user.Password)
-	if err != nil {
-		return "", err
-	}
-
-	validToken, err := GenerateJWT(user.ID, user.Username, user.Phone)
-	if err != nil {
-		return "", err
-	}
-
-	return validToken, err
-
-}
-
-func (u *User) Register(username string, phone string, password string) (string, error) {
-	var err error
-
-	// user := User{}
-	var id int64
-
-	db := db.CreateConnection()
-	err = db.QueryRow(`SELECT id FROM users WHERE phone=$1`, phone).Scan(&id)
-
-	switch err {
-	// if no user found, so user can create new (register)
-	case sql.ErrNoRows:
-		newP, err := GeneratehashPassword(password)
-
-		if err != nil {
-			return "", err
-		}
-
-		newU := User{
-			Username: username,
-			Phone:    phone,
-			Password: newP,
-		}
-		_, err = u.InsertUser(newU)
-		if err != nil {
-			return "", err
-		}
-		return "", err
-
-	// if user found
-	case nil:
-		return "user already exist", errors.New("user already exist")
-
-	default:
-		break
-	}
-
-	return "success", err
-}
-
 func (u *User) InsertUser(user User) (int64, error) {
-	// create the db connection
 	db := db.CreateConnection()
-
-	// close the db connection
 	defer db.Close()
 
-	// create the insert query
-	// returning userid will return the id of the inserted user
 	sqlStatement := `INSERT INTO users (username, phone, password) VALUES ($1, $2, $3) RETURNING id;`
 
-	// inserted id will store in this id
 	var id int64
-
-	// execute the sql statement
-	// scan function will save the inserted id in the id
 	err := db.QueryRow(sqlStatement, user.Username, user.Phone, user.Password).Scan(&id)
 
-	helpers.CheckError("Unable to execute the query.", err)
-
-	fmt.Printf("Inserted a single record %v", id)
-
-	// return the inserted id
 	return id, err
 }
 

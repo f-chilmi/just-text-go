@@ -9,11 +9,45 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/f-chilmi/just-text-go/models"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var secretkey = os.Getenv("SECRET_KEY")
+
+func CheckPasswordHash(password, hash string) error {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err
+}
+
+func GeneratehashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
+
+func GenerateJWT(id int64, username string, phone string) (models.GenerateTokenRes, string, error) {
+	var mySigningKey = []byte(secretkey)
+	token := jwt.New(jwt.SigningMethodHS256)
+	claims := token.Claims.(jwt.MapClaims)
+
+	claims["id"] = id
+	claims["phone"] = phone
+	claims["username"] = username
+	claims["exp"] = time.Now().Add(time.Minute * 30).Unix()
+
+	tokenString, err := token.SignedString(mySigningKey)
+
+	var res models.GenerateTokenRes
+	res.ID = id
+	res.Phone = phone
+	res.Username = username
+	res.Exp = time.Now().Add(time.Minute * 30).Unix()
+
+	return res, tokenString, err
+}
 
 func TokenValid(r *http.Request) error {
 	tokenString := ExtractToken(r)
