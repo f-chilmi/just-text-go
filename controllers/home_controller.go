@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 
+	"github.com/f-chilmi/just-text-go/auth"
 	"github.com/f-chilmi/just-text-go/helpers"
 	"github.com/f-chilmi/just-text-go/models"
 	"github.com/f-chilmi/just-text-go/responses"
@@ -73,9 +74,6 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func FindAll(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
 	userM := models.User{}
 
 	users, err := userM.GetUsers()
@@ -90,9 +88,6 @@ func FindAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func FindById(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
 	// get the userid from the request params, key is "id"
 	params := mux.Vars(r)
 
@@ -318,8 +313,6 @@ func OpenRoom(w http.ResponseWriter, r *http.Request) {
 }
 
 func ListRoom(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	var err error
 
@@ -328,14 +321,13 @@ func ListRoom(w http.ResponseWriter, r *http.Request) {
 	// for token id
 	// params := mux.Vars(r)
 
-	// idR, err := strconv.Atoi(params["id"])
-	idR := 1
+	idR, err := auth.ExtracTokenID(r)
 	if err != nil {
 		responses.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
 
-	roomChat, err := roomM.ListRoomByToken(idR)
+	roomChat, err := roomM.ListRoomByToken(int(idR))
 
 	if err != nil {
 		responses.ERROR(w, http.StatusBadRequest, err)

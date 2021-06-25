@@ -6,6 +6,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/f-chilmi/just-text-go/controllers"
+	"github.com/f-chilmi/just-text-go/middlewares"
 )
 
 func Router() *mux.Router {
@@ -17,11 +18,11 @@ func Router() *mux.Router {
 	router.HandleFunc("/login", controllers.Login).Methods("POST", "OPTIONS")
 
 	// users
-	router.HandleFunc("/", controllers.HomeController).Methods("GET", "OPTIONS")
-	router.HandleFunc("/users", controllers.FindAll).Methods("GET", "OPTIONS")
-	router.HandleFunc("/user/{id}", controllers.FindById).Methods("GET", "OPTIONS")
+	router.HandleFunc("/", middlewares.SetMiddlewareAuth(controllers.HomeController)).Methods("GET", "OPTIONS")
+	router.HandleFunc("/users", middlewares.SetMiddlewareAuth(controllers.FindAll)).Methods("GET", "OPTIONS")
+	router.HandleFunc("/user/{id}", middlewares.SetMiddlewareAuth(controllers.FindById)).Methods("GET", "OPTIONS")
 	router.HandleFunc("/user", controllers.CreateUser).Methods("POST", "OPTIONS")
-	router.HandleFunc("/user/{id}", controllers.UpdateUser).Methods("PUT", "OPTIONS")
+	router.HandleFunc("/user/{id}", middlewares.SetMiddlewareAuth(controllers.UpdateUser)).Methods("PUT", "OPTIONS")
 
 	router.HandleFunc("/new-msg", controllers.NewMsg).Methods("POST", "OPTIONS")
 
@@ -30,7 +31,7 @@ func Router() *mux.Router {
 
 	// get rooms
 	// by token
-	router.HandleFunc("/room", controllers.ListRoom).Methods("GET", "OPTIONS")
+	router.HandleFunc("/room", middlewares.SetMiddlewareAuth(controllers.ListRoom)).Methods("GET", "OPTIONS")
 	// by room id
 	router.HandleFunc("/room/{id}", controllers.OpenRoom).Methods("GET", "OPTIONS")
 

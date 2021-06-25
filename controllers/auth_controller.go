@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/f-chilmi/just-text-go/helpers"
 	"github.com/f-chilmi/just-text-go/models"
 	"github.com/f-chilmi/just-text-go/responses"
 )
@@ -23,27 +22,31 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, err)
+		responses.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
 	err = json.Unmarshal(body, &userM)
 	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, err)
+		responses.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
 
+	fmt.Println("aman")
+
 	userM.Prepare()
 	err = userM.Validate("login")
+	fmt.Println("validate")
 	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, err)
+		responses.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
 	token, err := userM.Login(userM.Phone, userM.Password)
 	if err != nil {
-		helpers.CheckError("error: ", err)
-		responses.ERROR(w, http.StatusUnprocessableEntity, err)
+		responses.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
+
+	fmt.Println("login")
 	responses.JSON(w, http.StatusOK, token)
 }
 
@@ -59,38 +62,30 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, err)
+		responses.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
 	err = json.Unmarshal(body, &userM)
 	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, err)
+		responses.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
 
 	userM.Prepare()
 	err = userM.Validate("register")
 	if err != nil {
-		responses.ERROR(w, http.StatusUnprocessableEntity, err)
+		responses.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
 
 	fmt.Println(userM)
 
-	msg, err := userM.Register(userM.Username, userM.Phone, userM.Password)
-	fmt.Println(msg, err)
+	_, err = userM.Register(userM.Username, userM.Phone, userM.Password)
+	if err != nil {
+		responses.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
 
-	// hashedPassword, err := Hash(u.Password)
-	// if err != nil {
-	// 	return err
-	// }
-	// u.Password = string(hashedPassword)
-
-	// token, err := userM.Login(userM.Phone, userM.Password)
-	// if err != nil {
-	// 	helpers.CheckError("error: ", err)
-	// 	responses.ERROR(w, http.StatusUnprocessableEntity, err)
-	// 	return
-	// }
-	// responses.JSON(w, http.StatusOK, token)
+	res := basicRes{Message: "user created successfully"}
+	responses.JSON(w, http.StatusOK, res)
 }
