@@ -43,7 +43,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		responses.ERROR(w, http.StatusBadRequest, err)
 	}
 
-	response, validToken, err := auth.GenerateJWT(userM.ID, userM.Username, userM.Phone)
+	response, validToken, err := auth.GenerateJWT(userExisted.ID, userExisted.Username, userM.Phone)
 	if err != nil {
 		responses.ERROR(w, http.StatusBadRequest, err)
 	}

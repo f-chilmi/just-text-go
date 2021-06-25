@@ -23,13 +23,16 @@ func Router() *mux.Router {
 	router.HandleFunc("/new-msg", controllers.NewMsg).Methods("POST", "OPTIONS")
 
 	// find user by phone
-	router.HandleFunc("/phone/{phone}", controllers.FindByPhone).Methods("GET", "OPTIONS")
+	router.HandleFunc("/phone/{phone}", middlewares.SetMiddlewareAuth(controllers.FindRoomByPhone)).Methods("GET", "OPTIONS")
 
 	// get rooms
 	// by token
 	router.HandleFunc("/room", middlewares.SetMiddlewareAuth(controllers.ListRoom)).Methods("GET", "OPTIONS")
 	// by room id
-	router.HandleFunc("/room/{id}", controllers.OpenRoom).Methods("GET", "OPTIONS")
+	router.HandleFunc("/room/{id}", middlewares.SetMiddlewareAuth(controllers.OpenRoom)).Methods("GET", "OPTIONS")
+
+	// send message
+	router.HandleFunc("/msg/{id}", middlewares.SetMiddlewareAuth(controllers.SendMsg)).Methods("POST", "OPTIONS")
 
 	return router
 }
