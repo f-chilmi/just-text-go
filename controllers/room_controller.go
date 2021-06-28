@@ -3,7 +3,6 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -12,71 +11,6 @@ import (
 	"github.com/f-chilmi/just-text-go/responses"
 	"github.com/gorilla/mux"
 )
-
-func NewMsg(w http.ResponseWriter, r *http.Request) {
-	// set the header to content type x-www-form-urlencoded
-	// Allow all origin to handle cors issue
-	// w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
-	// w.Header().Set("Access-Control-Allow-Origin", "*")
-	// w.Header().Set("Access-Control-Allow-Methods", "POST")
-	// w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-	messageM := models.Message{}
-	roomM := models.Room{}
-
-	// create an empty user of type models.User
-	var message models.Message
-
-	err := json.NewDecoder(r.Body).Decode(&message)
-
-	if err != nil {
-		responses.ERROR(w, http.StatusBadRequest, err)
-		return
-	}
-
-	// check if rooms existed
-	roomsExisted, err := roomM.FindRoom(message.IdSender, message.IdRecipient)
-
-	fmt.Println("roomsExisted", roomsExisted, err)
-
-	var idRoom int64
-
-	// create new room if no room found
-	if err == sql.ErrNoRows {
-		fmt.Println("no rooms")
-		var dataRoom models.Room
-		dataRoom.IdUser1 = message.IdRecipient
-		dataRoom.IdUser2 = message.IdSender
-		dataRoom.LastMsg = message.Content
-
-		idRoom, err = roomM.NewRoom(dataRoom)
-
-		if err != nil {
-			responses.ERROR(w, http.StatusBadRequest, err)
-			return
-		}
-	}
-
-	idRoom = roomsExisted.ID
-
-	// create new message
-	message.IdRoom = idRoom
-	newM, err := messageM.NewMsg(message)
-
-	if err != nil {
-		responses.ERROR(w, http.StatusBadRequest, err)
-		return
-	}
-
-	newM.IdRoom = idRoom
-	res := responseNew{
-		Message: newM,
-	}
-
-	// send all the users as response
-	responses.JSON(w, http.StatusOK, res)
-	// json.NewEncoder(w).Encode(res)
-}
 
 func SendMsg(w http.ResponseWriter, r *http.Request) {
 	messageM := models.Message{}

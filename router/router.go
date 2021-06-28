@@ -20,8 +20,6 @@ func Router() *mux.Router {
 	router.HandleFunc("/user/{id}", middlewares.SetMiddlewareAuth(controllers.FindById)).Methods("GET", "OPTIONS")
 	router.HandleFunc("/user/{id}", middlewares.SetMiddlewareAuth(controllers.UpdateUser)).Methods("PUT", "OPTIONS")
 
-	router.HandleFunc("/new-msg", controllers.NewMsg).Methods("POST", "OPTIONS")
-
 	// find user by phone
 	router.HandleFunc("/phone/{phone}", middlewares.SetMiddlewareAuth(controllers.FindRoomByPhone)).Methods("GET", "OPTIONS")
 
