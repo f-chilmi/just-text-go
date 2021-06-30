@@ -20,6 +20,11 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type UserData struct {
+	Username string `json:"username"`
+	Phone    string `json:"phone"`
+}
+
 type GenerateTokenRes struct {
 	ID       int64  `json:"id"`
 	Phone    string `json:"phone"`

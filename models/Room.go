@@ -16,6 +16,17 @@ type Room struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type RoomResponse struct {
+	ID        int64     `json:"id"`
+	IdUser1   int64     `json:"id_user1"`
+	IdUser2   int64     `json:"id_user2"`
+	User1     UserData  `json:"user1"`
+	User2     UserData  `json:"user2"`
+	LastMsg   string    `json:"last_msg"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 func (r *Room) FindRoom(idUser1 int64, idUser2 int64) (Room, error) {
 	// create the db connection
 	db := db.CreateConnection()
@@ -160,4 +171,27 @@ func (ru *Room) NewRoom(r Room) (int64, error) {
 
 	// return the inserted message
 	return idRoom, err
+}
+
+func (r *Room) UpdateLastMsg(idRoom int64, msg string) error {
+
+	// create the postgres db connection
+	db := db.CreateConnection()
+
+	// close the db connection
+	defer db.Close()
+
+	// create the update sql query
+	sqlStatement := `UPDATE rooms SET last_msg=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$1`
+
+	// execute the sql statement
+	res, err := db.Exec(sqlStatement, idRoom, msg)
+	if err != nil {
+		return err
+	}
+
+	// check how many rows affected
+	_, err = res.RowsAffected()
+
+	return err
 }
