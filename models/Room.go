@@ -7,27 +7,47 @@ import (
 	"github.com/f-chilmi/just-text-go/helpers"
 )
 
-type Room struct {
+type RoomDb struct {
 	ID        int64     `json:"id"`
 	IdUser1   int64     `json:"id_user1"`
 	IdUser2   int64     `json:"id_user2"`
 	LastMsg   string    `json:"last_msg"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type RoomList struct {
+	ID        int64     `json:"id"`
+	IdUser1   int64     `json:"id_user1"`
+	Username1 string    `json:"username1"`
+	Phone1    string    `json:"phone1"`
+	IdUser2   int64     `json:"id_user2"`
+	Username2 string    `json:"username2"`
+	Phone2    string    `json:"phone2"`
+	LastMsg   string    `json:"last_msg"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+type Room struct {
+	ID             int64     `json:"id"`
+	IdRecipient    int64     `json:"id_recipient"`
+	UnameRecipient string    `json:"uname_recipient"`
+	PhoneRecipient string    `json:"phone_recipient"`
+	LastMsg        string    `json:"last_msg"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type RoomResponse struct {
-	ID        int64     `json:"id"`
-	IdUser1   int64     `json:"id_user1"`
-	IdUser2   int64     `json:"id_user2"`
-	User1     UserData  `json:"user1"`
-	User2     UserData  `json:"user2"`
-	LastMsg   string    `json:"last_msg"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          int64     `json:"id"`
+	IdRecipient int64     `json:"id_recipient"`
+	Recipient   UserData  `json:"recipient"`
+	LastMsg     string    `json:"last_msg"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-func (r *Room) FindRoom(idUser1 int64, idUser2 int64) (Room, error) {
+func (r *Room) FindRoom(myId int64, idUser2 int64) (Room, error) {
 	// create the db connection
 	db := db.CreateConnection()
 
@@ -35,21 +55,63 @@ func (r *Room) FindRoom(idUser1 int64, idUser2 int64) (Room, error) {
 	defer db.Close()
 
 	// create the select query
-	sqlStatement := `SELECT * FROM rooms WHERE (id_user1=$1 AND id_user2=$2) OR (id_user1=$2 AND id_user2=$1);`
+	// sqlStatement := `SELECT * FROM rooms WHERE (id_user1=$1 AND id_user2=$2) OR (id_user1=$2 AND id_user2=$1);`
+	sqlStatement := `
+		SELECT 
+			rooms.id, 
+			id_user1, 
+			a.username as username1, 
+			a.phone as phone1, 
+			id_user2, 
+			b.username as username2, 
+			b.phone as phone2, 
+			last_msg, 
+			rooms.created_at, 
+			rooms.updated_at from rooms 
+		INNER JOIN users a on rooms.id_user1 = a.id
+		INNER JOIN users b on rooms.id_user2 = b.id
+		WHERE (id_user1=$1 AND id_user2=$2) OR (id_user1=$2 AND id_user2=$1)`
 
-	// inserted id will store in this id
-	var room Room
-
+	var room RoomList
+	var newR Room
 	// execute the sql statement
-	row := db.QueryRow(sqlStatement, idUser1, idUser2)
+	row := db.QueryRow(sqlStatement, myId, idUser2)
+	err := row.Scan(
+		&room.ID,
+		&room.IdUser1,
+		&room.Username1,
+		&room.Phone1,
+		&room.IdUser2,
+		&room.Username2,
+		&room.Phone2,
+		&room.LastMsg,
+		&room.CreatedAt,
+		&room.UpdatedAt,
+	)
+	if err != nil {
+		return newR, err
+	}
 
-	err := row.Scan(&room.ID, &room.IdUser1, &room.IdUser2, &room.LastMsg, &room.CreatedAt, &room.UpdatedAt)
-
+	newR = Room{
+		ID:        room.ID,
+		LastMsg:   room.LastMsg,
+		CreatedAt: room.CreatedAt,
+		UpdatedAt: room.UpdatedAt,
+	}
+	if room.IdUser1 == myId {
+		newR.IdRecipient = room.IdUser2
+		newR.UnameRecipient = room.Username2
+		newR.PhoneRecipient = room.Phone2
+	} else {
+		newR.IdRecipient = room.IdUser1
+		newR.UnameRecipient = room.Username1
+		newR.PhoneRecipient = room.Phone1
+	}
 	// return the inserted message
-	return room, err
+	return newR, err
 }
 
-func (r *Room) FindRoomById(id int64) (Room, error) {
+func (r *Room) FindRoomById(id int64) (RoomList, error) {
 	// create the db connection
 	db := db.CreateConnection()
 
@@ -57,15 +119,40 @@ func (r *Room) FindRoomById(id int64) (Room, error) {
 	defer db.Close()
 
 	// create the select query
-	sqlStatement := `SELECT * FROM rooms WHERE id=$1;`
+	// sqlStatement := `SELECT * FROM rooms WHERE id=$1;`
+	sqlStatement := `
+		SELECT 
+			rooms.id, 
+			id_user1, 
+			a.username as username1, 
+			a.phone as phone1, 
+			id_user2, 
+			b.username as username2, 
+			b.phone as phone2, 
+			last_msg, 
+			rooms.created_at, 
+			rooms.updated_at from rooms 
+		INNER JOIN users a on rooms.id_user1 = a.id
+		INNER JOIN users b on rooms.id_user2 = b.id
+		WHERE rooms.id=$1`
 
 	// inserted id will store in this id
-	var room Room
+	var room RoomList
 
 	// execute the sql statement
 	row := db.QueryRow(sqlStatement, id)
-
-	err := row.Scan(&room.ID, &room.IdUser1, &room.IdUser2, &room.LastMsg, &room.CreatedAt, &room.UpdatedAt)
+	err := row.Scan(
+		&room.ID,
+		&room.IdUser1,
+		&room.Username1,
+		&room.Phone1,
+		&room.IdUser2,
+		&room.Username2,
+		&room.Phone2,
+		&room.LastMsg,
+		&room.CreatedAt,
+		&room.UpdatedAt,
+	)
 
 	// return the inserted message
 	return room, err
@@ -123,7 +210,22 @@ func (r *Room) ListRoomByToken(idR int) ([]Room, error) {
 	var rooms []Room
 
 	// create the select sql query
-	sqlStatement := `SELECT * FROM rooms WHERE id_user1=$1 OR id_user2=$1`
+	// sqlStatement := `SELECT * FROM rooms WHERE id_user1=$1 OR id_user2=$1`
+	sqlStatement := `
+	SELECT 
+		rooms.id, 
+		id_user1, 
+		a.username as username1, 
+		a.phone as phone1, 
+		id_user2, 
+		b.username as username2, 
+		b.phone as phone2, 
+		last_msg, 
+		rooms.created_at, 
+		rooms.updated_at from rooms 
+	INNER JOIN users a on rooms.id_user1 = a.id
+	INNER JOIN users b on rooms.id_user2 = b.id
+	WHERE id_user1=$1 OR id_user2=$1`
 
 	// execute the sql statement
 	rows, err := db.Query(sqlStatement, idR)
@@ -135,15 +237,42 @@ func (r *Room) ListRoomByToken(idR int) ([]Room, error) {
 
 	// iterate over the rows
 	for rows.Next() {
-		var room Room
-
+		var room RoomList
 		// unmarshal the row object to user
-		err = rows.Scan(&room.ID, &room.IdUser1, &room.IdUser2, &room.LastMsg, &room.CreatedAt, &room.UpdatedAt)
+		err = rows.Scan(
+			&room.ID,
+			&room.IdUser1,
+			&room.Username1,
+			&room.Phone1,
+			&room.IdUser2,
+			&room.Username2,
+			&room.Phone2,
+			&room.LastMsg,
+			&room.CreatedAt,
+			&room.UpdatedAt,
+		)
+		if err != nil {
+			return rooms, err
+		}
 
-		helpers.CheckError("Unable to scan the row.", err)
+		newR := Room{
+			ID:        room.ID,
+			LastMsg:   room.LastMsg,
+			CreatedAt: room.CreatedAt,
+			UpdatedAt: room.UpdatedAt,
+		}
+		if room.IdUser1 == int64(idR) {
+			newR.IdRecipient = room.IdUser2
+			newR.UnameRecipient = room.Username2
+			newR.PhoneRecipient = room.Phone2
+		} else {
+			newR.IdRecipient = room.IdUser1
+			newR.UnameRecipient = room.Username1
+			newR.PhoneRecipient = room.Phone1
+		}
 
 		// append the user in the users slice
-		rooms = append(rooms, room)
+		rooms = append(rooms, newR)
 
 	}
 
@@ -151,7 +280,7 @@ func (r *Room) ListRoomByToken(idR int) ([]Room, error) {
 	return rooms, err
 }
 
-func (ru *Room) NewRoom(r Room) (int64, error) {
+func (ru *Room) NewRoom(r RoomDb) (int64, error) {
 	// create the db connection
 	db := db.CreateConnection()
 

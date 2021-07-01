@@ -48,3 +48,16 @@ CREATE TABLE
     FOREIGN KEY (id_user2) REFERENCES users (id),
     FOREIGN KEY (id_last_msg) REFERENCES messages (id)
   );
+
+CREATE TABLE
+  rooms (
+    id serial PRIMARY KEY,
+    id_recipient int NOT NULL,
+    id_last_msg INT NOT NULL,
+    last_msg VARCHAR (255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+    -- updated at still not updated 
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_recipient) REFERENCES users (id),
+    FOREIGN KEY (id_last_msg) REFERENCES messages (id)
+  );

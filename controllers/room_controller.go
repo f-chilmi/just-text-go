@@ -3,7 +3,6 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -56,8 +55,6 @@ func SendMsg(w http.ResponseWriter, r *http.Request) {
 	message.CreatedAt = newM.CreatedAt
 	message.UpdatedAt = newM.UpdatedAt
 
-	fmt.Println("message", message)
-
 	err = roomM.UpdateLastMsg(int64(idRoom), message.Content)
 	if err != nil {
 		responses.ERROR(w, http.StatusBadRequest, err)
@@ -80,7 +77,6 @@ func FindRoomByPhone(w http.ResponseWriter, r *http.Request) {
 	phone := params["phone"]
 
 	user, err := userM.GetUserByPhone(phone)
-
 	switch err {
 	case sql.ErrNoRows:
 		res := basicRes{Message: "no user found"}
@@ -101,11 +97,10 @@ func FindRoomByPhone(w http.ResponseWriter, r *http.Request) {
 
 	// if user found, then check is there room for id token (me) and user.ID
 	roomExisted, err := roomM.FindRoom(int64(myId), int64(user.ID))
-
 	switch err {
 	case sql.ErrNoRows:
 
-		newR := models.Room{
+		newR := models.RoomDb{
 			IdUser1: myId,
 			IdUser2: user.ID,
 			LastMsg: "",
@@ -117,10 +112,25 @@ func FindRoomByPhone(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		roomExisted, err = roomM.FindRoomById(idRoom)
+		var roomF models.RoomList
+		roomF, err = roomM.FindRoomById(idRoom)
 		if err != nil {
 			responses.ERROR(w, http.StatusBadRequest, err)
 			return
+		}
+
+		roomExisted.ID = roomF.ID
+		roomExisted.LastMsg = roomF.LastMsg
+		roomExisted.CreatedAt = roomF.CreatedAt
+		roomExisted.UpdatedAt = roomF.UpdatedAt
+		if roomF.IdUser1 == myId {
+			roomExisted.IdRecipient = roomF.IdUser2
+			roomExisted.UnameRecipient = roomF.Username2
+			roomExisted.PhoneRecipient = roomF.Phone2
+		} else {
+			roomExisted.IdRecipient = roomF.IdUser1
+			roomExisted.UnameRecipient = roomF.Username1
+			roomExisted.PhoneRecipient = roomF.Phone1
 		}
 
 	case nil:
@@ -130,40 +140,8 @@ func FindRoomByPhone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var roomRes models.RoomResponse
-
-	if roomExisted.IdUser1 == myId {
-		roomRes = models.RoomResponse{
-			ID:      roomExisted.ID,
-			IdUser1: roomExisted.IdUser1,
-			IdUser2: roomExisted.IdUser2,
-			// User1: user,
-			User2: models.UserData{
-				Username: user.Username,
-				Phone:    user.Phone,
-			},
-			LastMsg:   roomExisted.LastMsg,
-			CreatedAt: roomExisted.CreatedAt,
-			UpdatedAt: roomExisted.UpdatedAt,
-		}
-	} else {
-		roomRes = models.RoomResponse{
-			ID:      roomExisted.ID,
-			IdUser1: roomExisted.IdUser1,
-			IdUser2: roomExisted.IdUser2,
-			User1: models.UserData{
-				Username: user.Username,
-				Phone:    user.Phone,
-			},
-			// User2:     user,
-			LastMsg:   roomExisted.LastMsg,
-			CreatedAt: roomExisted.CreatedAt,
-			UpdatedAt: roomExisted.UpdatedAt,
-		}
-	}
-
 	// send all the users as response
-	responses.JSON(w, http.StatusOK, roomRes)
+	responses.JSON(w, http.StatusOK, roomExisted)
 
 }
 
@@ -195,9 +173,6 @@ func ListRoom(w http.ResponseWriter, r *http.Request) {
 
 	roomM := models.Room{}
 
-	// for token id
-	// params := mux.Vars(r)
-
 	myId, err := auth.ExtracTokenID(r)
 	if err != nil {
 		responses.ERROR(w, http.StatusBadRequest, err)
@@ -205,51 +180,12 @@ func ListRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	roomChat, err := roomM.ListRoomByToken(int(myId))
-
-	var roomR []models.RoomResponse
-
-	for _, room := range roomChat {
-		fmt.Println("room: ", room)
-		var roomRes models.RoomResponse
-		if room.IdUser1 == myId {
-			roomRes = models.RoomResponse{
-				ID:      room.ID,
-				IdUser1: room.IdUser1,
-				IdUser2: room.IdUser2,
-				// User1: user,
-				// User2: models.UserData{
-				// 	Username: user.Username,
-				// 	Phone:    user.Phone,
-				// },
-				LastMsg:   room.LastMsg,
-				CreatedAt: room.CreatedAt,
-				UpdatedAt: room.UpdatedAt,
-			}
-		} else {
-			roomRes = models.RoomResponse{
-				ID:      room.ID,
-				IdUser1: room.IdUser1,
-				IdUser2: room.IdUser2,
-				// User1: models.UserData{
-				// 	Username: user.Username,
-				// 	Phone:    user.Phone,
-				// },
-				// User2:     user,
-				LastMsg:   room.LastMsg,
-				CreatedAt: room.CreatedAt,
-				UpdatedAt: room.UpdatedAt,
-			}
-		}
-		roomR = append(roomR, roomRes)
-	}
-	fmt.Println("roomR ", roomR)
-
 	if err != nil {
 		responses.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
 
 	// send all the users as response
-	responses.JSON(w, http.StatusOK, roomR)
+	responses.JSON(w, http.StatusOK, roomChat)
 
 }
